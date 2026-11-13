@@ -1,0 +1,12 @@
+name = "aio-plog-monitor"
+version = "0.1.0"
+description = "AIOps Log Monitor con ML explicable y API FastAPI"
+requires-python = ">=3.9"
+
+[project.scripts]
+aio-ingest = "src.ingestion.parse:main"
+aio-train = "src.ml.train:main"
+aio-server = "src.api.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

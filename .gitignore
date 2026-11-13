@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+# Virtual environments
+*/venv
+*/.venv
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker artifacts
+Dockerfile*
+
+# Specific file
+docs/Globant - 2026 Tech Trends report - ES.pdf
+*Globant - 2026 Tech Trends report - ES.pdf
+
+# Generated artifacts (analysis / report outputs)
+processed_events_analysis.csv
