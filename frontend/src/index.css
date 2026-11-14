@@ -1,0 +1,125 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0b0e11;
+  color: #e8eaed;
+}
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+.badge {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.4rem;
+  background: #161b22;
+  color: #c9d1d9;
+}
+.badge.ok {
+  background: #14532d;
+  color: #a7f3d0;
+}
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 0.6rem;
+  padding: 1.25rem;
+}
+.card h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+}
+.muted {
+  color: #8b949e;
+  font-size: 0.9rem;
+}
+.error {
+  color: #ff7b72;
+  font-size: 0.9rem;
+}
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+.kpi {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+.kpi-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.4rem;
+  border: 1px solid #30363d;
+  background: #238636;
+  color: #fff;
+  cursor: pointer;
+}
+button:disabled {
+  background: #4c566a;
+  cursor: not-allowed;
+}
+button:hover:not(:disabled) {
+  background: #2ea043;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid #30363d;
+}
+code {
+  font-family: ui-monospace, monospace;
+  background: #0d1117;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.3rem;
+  font-size: 0.85rem;
+  color: #ffa657;
+}
+details {
+  margin-top: 0.75rem;
+}
+summary {
+  cursor: pointer;
+  color: #58a6ff;
+}

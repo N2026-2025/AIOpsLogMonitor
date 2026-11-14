@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Query, Body
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Query, Body, Request
+from fastapi.responses import JSONResponse, Response
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import os
+import time
 import pandas as pd
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # Imports locales
 from src.ml.train import AioMLPipeline
@@ -26,6 +28,33 @@ try:
     init_database()
 except Exception as e:
     print(f"Warning: database initialization skipped: {e}")
+
+# Metrics
+REQUEST_COUNT = Counter(
+    "aioplog_api_requests_total",
+    "Total number of AIOps API requests",
+    ["method", "endpoint", "status"]
+)
+REQUEST_DURATION = Histogram(
+    "aioplog_api_request_duration_seconds",
+    "Request duration in seconds",
+    ["method", "endpoint"]
+)
+
+
+@app.middleware("http")
+async def add_prometheus_metrics(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+    REQUEST_DURATION.labels(method=request.method, endpoint=request.url.path).observe(duration)
+    REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path, status=response.status_code).inc()
+    return response
+
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 class IngestRequest(BaseModel):
     """Request para ingestión de datos."""

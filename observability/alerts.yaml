@@ -1,0 +1,32 @@
+groups:
+  - name: aiops-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(aioplog_api_requests_total{status=~"5.."}[5m])) / sum(rate(aioplog_api_requests_total[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: aiops-log-monitor
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate above 10% over the last 5 minutes"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(aioplog_api_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: aiops-log-monitor
+        annotations:
+          summary: "High p95 latency"
+          description: "p95 API latency above 2 seconds over the last 5 minutes"
+
+      - alert: HighPredictionFailureRate
+        expr: sum(rate(aioplog_api_requests_total{endpoint="/api/v1/predict"}[10m])) > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: aiops-log-monitor
+        annotations:
+          summary: "High prediction volume"
+          description: "More than 100 predictions in last 10 minutes - possible incident"

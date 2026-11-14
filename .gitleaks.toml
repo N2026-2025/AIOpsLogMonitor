@@ -1,0 +1,21 @@
+version: "0.45"
+title: "Gitleaks Configuration"
+verbose: true
+allow: ""
+source: ""
+redact: true
+disabled_rules: []
+rules:
+  - id: aiops-api-key
+    description: "Detect potential API keys in AIOps code"
+    regex: "(?i)(api[_-]?key|secret[_-]?key|access[_-]?token)\s*[=:]\s*[\"'][a-zA-Z0-9_-]{20,}[\"']"
+    tags: ["key", "secret"]
+    entropy: 3.5
+  - id: aiops-db-url
+    description: "Detect database connection strings"
+    regex: "(?i)(postgresql|postgres|mysql|mongodb)://[^\\s\"']+"
+    tags: ["secret", "database"]
+  - id: aiops-model-path
+    description: "Detect hardcoded model artifact paths"
+    regex: "(?i)(aioplogmonitor_models_v\\d+\\.\\d+\\.\\d+\\.pkl)"
+    tags: ["model", "artifact"]

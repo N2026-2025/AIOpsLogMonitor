@@ -1,0 +1,28 @@
+rules:
+  - id: aioplogmonitor-sql-injection
+    message: "Possible SQL injection vulnerability"
+    languages: [python]
+    pattern: |
+      import ...
+      import sqlalchemy
+      ...
+      sqlalchemy.text(...)
+  - id: aioplogmonitor-hardcoded-secrets
+    message: "Hardcoded secret detected"
+    languages: [python]
+    pattern: |
+      SECRET_KEY = "..."
+  - id: aioplogmonitor-weak-random
+    message: "Use of weak random number generator"
+    languages: [python]
+    pattern: |
+      import random
+      ...
+      random.random()
+  - id: aioplogmonitor-path-traversal
+    message: "Potential path traversal"
+    languages: [python]
+    pattern: |
+      import os
+      ...
+      os.path.join(user_input, ...)

@@ -1,0 +1,17 @@
+scanners:
+  - vuln
+  - secret
+  - misconfig
+format: table
+exit-code: 0
+severity:
+  - HIGH
+  - CRITICAL
+ignore-unfixed: false
+skip-dirs:
+  - .git
+  - __pycache__
+  - .pytest_cache
+  - .venv
+  - node_modules
+  - e2e
