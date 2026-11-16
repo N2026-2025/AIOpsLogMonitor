@@ -1,7 +1,7 @@
-# docker-compose.yml - PostgreSQL para AIOps Log Monitor
+# docker-compose.yml - Stack completo para AIOps Log Monitor
 # Uso:
-#   docker compose up -d postgres
-#   python -m src.storage.init init
+#   docker compose up --build   # levanta db + app
+#   docker compose down         # detiene todo
 #
 # Variables de entorno (opcional):
 #   DATABASE_URL=postgresql://aion:aion@localhost:5432/aioplogmonitor
@@ -10,6 +10,7 @@ version: "3.9"
 services:
   postgres:
     image: postgres:14-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: aioplogmonitor
       POSTGRES_USER: aion
@@ -22,7 +23,30 @@ services:
       test: ["CMD-SHELL", "pg_isready -U aion -d aioplogmonitor"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    networks:
+      - aiops
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://aion:aion@postgres:5432/aioplogmonitor"
+      AIOPS_MODEL_PATH: "src/artifacts/aioplogmonitor_models_v0.1.0.pkl"
+      AIOPS_CSV_PATH: "data/sample.csv"
+    ports:
+      - "8000:8000"
+    networks:
+      - aiops
 
 volumes:
   pgdata:
+
+networks:
+  aiops:
+    driver: bridge

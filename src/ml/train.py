@@ -4,8 +4,8 @@ import os
 from typing import Dict, Any
 from sklearn.ensemble import RandomForestClassifier, IsolationForest
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, make_scorer
 import joblib
 import shap
 
@@ -47,6 +47,7 @@ class AioMLPipeline:
             'day_of_week', 'duration_ms', 'status_code', 'hour', 'month', 'week',
             'line', 'process_id', 'event_count'
         ] if c in X.columns]
+        available_cols = list(dict.fromkeys(available_cols))
         
         # Filtrar solo columnas de tipo numerico para RF
         X_rf = X[available_cols].copy()
@@ -72,54 +73,108 @@ class AioMLPipeline:
         y_test = y_failure.iloc[test_idx]
         y_sev_train = y_severity.iloc[train_idx]
 
-        # Modelo de fallo (binario)
-        self.failure_model = RandomForestClassifier(
-            n_estimators=100, random_state=self.random_state, n_jobs=-1
+        # Modelo de fallo (binario) con tuning de hiperparametros
+        failure_param_grid = {
+            "n_estimators": [50, 100, 200],
+            "max_depth": [None, 10, 20],
+            "min_samples_leaf": [1, 3, 5],
+        }
+        failure_search = RandomizedSearchCV(
+            RandomForestClassifier(random_state=self.random_state, n_jobs=-1),
+            param_distributions=failure_param_grid,
+            n_iter=8,
+            cv=3,
+            scoring="f1",
+            random_state=self.random_state,
+            n_jobs=-1,
+            verbose=0,
         )
-        self.failure_model.fit(X_train, y_train)
+        failure_search.fit(X_train, y_train)
+        self.failure_model = failure_search.best_estimator_
+        self.failure_best_params = failure_search.best_params_
+        print(f"Failure model best params: {self.failure_best_params}")
 
-        # Modelo de severidad (multiclase)
+        # Modelo de severidad (multiclase) con tuning
         severity_encoder = LabelEncoder()
         severity_encoder.fit(y_severity)
-        severity_model = RandomForestClassifier(
-            n_estimators=100, random_state=self.random_state, n_jobs=-1
+        severity_param_grid = {
+            "n_estimators": [50, 100, 200],
+            "max_depth": [None, 10, 20],
+        }
+        severity_search = RandomizedSearchCV(
+            RandomForestClassifier(random_state=self.random_state, n_jobs=-1),
+            param_distributions=severity_param_grid,
+            n_iter=6,
+            cv=3,
+            scoring="f1_macro",
+            random_state=self.random_state,
+            n_jobs=-1,
+            verbose=0,
         )
-        severity_model.fit(X_train, severity_encoder.transform(y_sev_train))
+        severity_search.fit(X_train, severity_encoder.transform(y_sev_train))
+        severity_model = severity_search.best_estimator_
+        self.severity_best_params = severity_search.best_params_
+        print(f"Severity model best params: {self.severity_best_params}")
         self.severity_model = severity_model
         self.severity_encoder = severity_encoder
-        
-        # Modelo de anomalías Isolation Forest (sobre duracion)
-        anomaly_model = IsolationForest(
-            contamination=0.1, random_state=self.random_state, n_estimators=100
-        )
+
+        # Modelo de anomalias Isolation Forest con tuning
         anomaly_cols = ['log_duration', 'status_code', 'duration_ms']
         available_anomaly_cols = [c for c in anomaly_cols if c in X_rf.columns]
         if not available_anomaly_cols:
             available_anomaly_cols = numeric_cols[:3]
-        anomaly_model.fit(X_train[available_anomaly_cols])
-        self.anomaly_model = anomaly_model
+
+        def _anomaly_scorer(estimator, X, y=None):
+            # IsolationForest es no supervisado: puntuamos con score_samples
+            return float(np.mean(estimator.score_samples(X)))
+
+        anomaly_param_grid = {
+            "contamination": [0.05, 0.1, 0.2, 0.3],
+            "n_estimators": [50, 100, 200],
+            "max_samples": [0.5, 1.0],
+        }
+        anomaly_search = RandomizedSearchCV(
+            IsolationForest(random_state=self.random_state),
+            param_distributions=anomaly_param_grid,
+            n_iter=6,
+            cv=3,
+            scoring=_anomaly_scorer,
+            random_state=self.random_state,
+            n_jobs=1,
+            verbose=0,
+        )
+        anomaly_search.fit(X_train[available_anomaly_cols])
+        self.anomaly_model = anomaly_search.best_estimator_
+        self.anomaly_best_params = anomaly_search.best_params_
+        print(f"Anomaly model best params: {self.anomaly_best_params}")
         self.anomaly_cols = available_anomaly_cols
-        
+
         self.models_trained = True
-        
+
         # Evaluar
         y_pred = self.failure_model.predict(X_test)
         metrics = {
-            'failure_accuracy': float(accuracy_score(y_test, y_pred)),
-            'failure_precision': float(precision_score(y_test, y_pred, zero_division=0)),
-            'failure_recall': float(recall_score(y_test, y_pred, zero_division=0)),
-            'failure_f1': float(f1_score(y_test, y_pred, zero_division=0)),
+            "failure_accuracy": float(accuracy_score(y_test, y_pred)),
+            "failure_precision": float(precision_score(y_test, y_pred, zero_division=0)),
+            "failure_recall": float(recall_score(y_test, y_pred, zero_division=0)),
+            "failure_f1": float(f1_score(y_test, y_pred, zero_division=0)),
+            "failure_best_params": self.failure_best_params,
+            "severity_best_params": self.severity_best_params,
+            "anomaly_best_params": self.anomaly_best_params,
         }
-        
+
         # Guardar modelos
         artifacts = {
-            'failure_model': self.failure_model,
-            'severity_model': self.severity_model,
-            'anomaly_model': self.anomaly_model,
-            'severity_encoder': self.severity_encoder,
-            'anomaly_cols': self.anomaly_cols,
-            'model_version': self.model_version,
-            'feature_cols': self.feature_cols,
+            "failure_model": self.failure_model,
+            "severity_model": self.severity_model,
+            "anomaly_model": self.anomaly_model,
+            "severity_encoder": self.severity_encoder,
+            "anomaly_cols": self.anomaly_cols,
+            "model_version": self.model_version,
+            "feature_cols": self.feature_cols,
+            "failure_best_params": self.failure_best_params,
+            "severity_best_params": self.severity_best_params,
+            "anomaly_best_params": self.anomaly_best_params,
         }
         
         artifacts_path = os.path.join(
@@ -134,34 +189,39 @@ class AioMLPipeline:
     
     def _prepare_input(self, features: Dict[str, Any]) -> pd.DataFrame:
         """Preparar input para prediccion aplicando feature engineering."""
-        import pandas as pd
         row = pd.DataFrame([features])
         row = row.fillna(0)
-        
-        # Aplicar mismo feature engineering
-        row['hour_sin'] = np.sin(2 * np.pi * row['hour'] / 24) if 'hour' in row.columns else 0
-        row['hour_cos'] = np.cos(2 * np.pi * row['hour'] / 24) if 'hour' in row.columns else 0
-        
+
+        row['hour'] = row['hour'].astype(float) if 'hour' in row.columns else 0
+        row['hour_sin'] = np.sin(2 * np.pi * row['hour'] / 24)
+        row['hour_cos'] = np.cos(2 * np.pi * row['hour'] / 24)
+
         severity_map = {'LOW': 0, 'MEDIUM': 1, 'HIGH': 2}
-        row['severity_level'] = row.get('severity', 'MEDIUM').map(severity_map).fillna(1)
-        row['status_failure'] = (row.get('status', 'SUCCESS').str.lower() == 'failure').astype(int)
-        
-        row['log_duration'] = np.log1p(row.get('duration_ms', 0).fillna(0))
-        row['status_code_is_error'] = (row.get('status_code', 0) >= 400).astype(int)
-        
-        log_max = row.get('log_duration', 1).max()
+        row['severity'] = row['severity'].astype(str) if 'severity' in row.columns else 'MEDIUM'
+        row['severity_level'] = row['severity'].map(severity_map).fillna(1).astype(float)
+
+        row['status'] = row['status'].astype(str) if 'status' in row.columns else 'SUCCESS'
+        row['status_failure'] = row['status'].str.lower().eq('failure').astype(int)
+
+        row['duration_ms'] = row['duration_ms'].astype(float) if 'duration_ms' in row.columns else 0
+        row['status_code'] = row['status_code'].astype(float) if 'status_code' in row.columns else 0
+        row['log_duration'] = np.log1p(row['duration_ms'])
+        row['status_code_is_error'] = (row['status_code'] >= 400).astype(int)
+        row['is_weekend'] = row['is_weekend'].astype(int) if 'is_weekend' in row.columns else 0
+
+        log_max = float(row['log_duration'].max())
         row['risk_score'] = (
-            row.get('severity_level', 1) * 0.4 +
-            row.get('status_failure', 0) * 0.3 +
-            row.get('log_duration', 0) / log_max * 0.2 if log_max > 0 else 0 +
-            row.get('is_weekend', 0) * 0.1
+            row['severity_level'] * 0.4
+            + row['status_failure'] * 0.3
+            + (row['log_duration'] / log_max * 0.2 if log_max > 0 else 0)
+            + row['is_weekend'] * 0.1
         )
-        
+
         # Codificar categoricas igual que en train
         for col in row.columns:
             if row[col].dtype == 'object':
                 row[col] = row[col].astype(str)
-        
+
         return row
     
     def _align_features(self, row: pd.DataFrame) -> pd.DataFrame:

@@ -79,7 +79,7 @@ class StorageService:
         min_level = severity_order.get(min_severity.upper(), 0)
         
         query = session.query(models.Event).filter(
-            models.Event.status_failure == True,
+            models.Event.status_failure is True,
         )
         
         if min_level >= 2:

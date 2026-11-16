@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -8,7 +8,7 @@ class Event(Base):
     __tablename__ = 'events'
     
     id = Column(Integer, primary_key=True, index=True)
-    received_at = Column(DateTime(timezone=True), server_default='CURRENT_TIMESTAMP', nullable=False)
+    received_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     environment = Column(String, nullable=False, index=True)
     project = Column(String, nullable=False)
     hostname = Column(String, nullable=False)
@@ -39,7 +39,7 @@ class Event(Base):
     message = Column(Text)
     process_id = Column(Integer)
     
-    created_at = Column(DateTime(timezone=True), server_default='CURRENT_TIMESTAMP')
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     predictions = relationship('Prediction', back_populates='event', cascade='all, delete-orphan')
     
@@ -90,7 +90,7 @@ class Prediction(Base):
     severity_prediction = Column(String)
     anomaly_score = Column(Float)
     model_version = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default='CURRENT_TIMESTAMP')
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     event = relationship('Event', back_populates='predictions')
     

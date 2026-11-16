@@ -86,6 +86,24 @@ Git (para clonar repositorio)
 pip install -r requirements.txt
 ```
 
+> **Recomendación: entorno virtual.** Para aislar las dependencias del proyecto del resto del sistema,
+> crea y activa un `.venv` antes de instalar:
+>
+> ```bash
+> # Crear entorno virtual
+> python -m venv .venv
+>
+> # Activar (Windows PowerShell / cmd):
+> .venv\Scripts\activate
+> # Activar (Linux / macOS):
+> source .venv/bin/activate
+>
+> # Ahora sí instalar dependencias
+> pip install -r requirements.txt
+> ```
+>
+> El entorno virtual se ignora con Git (`/.venv` está en `.gitignore`).</arg_value>
+
 ### Paso a paso:
 
 1. **Inicializar base de datos**:
@@ -130,6 +148,35 @@ pip install -r requirements.txt
 curl http://localhost:8000/health
 # Expected: {"status":"ok","timestamp":"..."}
 ```
+
+## 5b. Análisis Exploratorio de Datos (EDA)
+
+El análisis exploratorio de los datos se realiza sobre `data/processed_events_analysis.csv`
+(1746 filas x 35 columnas). Los resultados y gráficos generados se guardan en `docs/eda/`.
+
+```bash
+# Ejecutar el script de EDA (genera PNGs en docs/eda/)
+python scripts/eda.py
+
+# Notebook interactivo (se exporta a scripts/eda.py para reproducibilidad)
+notebooks/eda.ipynb
+```
+
+### Hallazgos clave del EDA
+
+| Aspecto | Resultado |
+|---|---|
+| **Valores faltantes** | `message`, `file`, `line`, `logger_name`, `level` tienen 1677 nulos; `method`, `path`, `status_code`, `duration_ms` 1202 nulos (solo eventos HTTP) |
+| **Rango numérico** | `duration_ms`: 0–5037 ms (media 269); `status_code`: 200–504; `hour`: 5–14 |
+| **Distribución status** | SUCCESS 1275 (73%), FAILURE 471 (27%) |
+| **Distribución severity** | LOW 912, MEDIUM 717, HIGH 117 |
+| **Palabras frecuentes en message** | `on`, `exception`, `get`, `db`, `constraint`, `connection`, `timeout` |
+| **Feature importance (RF, target=FAILURE)** | `event_type` 0.50, `severity` 0.20, `method` 0.08, `category` 0.08, `status_code` 0.07 |
+
+Los gráficos generados son: `missing_values.png`, `numeric_distributions.png`,
+`status_distribution.png`, `severity_distribution.png`, `event_type_distribution.png`,
+`category_distribution.png`, `environment_distribution.png`, `correlation_matrix.png`,
+`message_word_frequencies.png`, `feature_importance.png`.
 
 ## 6. API REST Endpoints
 
@@ -235,9 +282,45 @@ trivy fs --exit-code 0 .
 - Grafana con datasource Prometheus
 - Panels: request rate, error rate, latency percentiles, prediction volume
 
+## 9b. Containerización con Docker
+
+El proyecto incluye un `Dockerfile` que empaqueta la API FastAPI y un `docker-compose.yml`
+que levanta la aplicación junto con PostgreSQL.
+
+### Build de la imagen
+
+```bash
+docker build -t aiops-log-monitor .
+```
+
+### Run del contenedor (solo la app)
+
+```bash
+docker run -p 8000:8000 aiops-log-monitor
+# Verificar:
+curl http://localhost:8000/health
+# Expected: {"status":"ok","timestamp":"..."}
+```
+
+> Nota: el contenedor necesita un modelo entrenado en `src/artifacts/`. Para generarlo
+> dentro de la imagen localmente antes del build, ejecuta `python -m src.ml.train`, o
+> entrena en tiempo de arranque personalizando el `CMD`.
+
+### Stack completo con docker-compose (app + PostgreSQL)
+
+```bash
+docker compose up --build     # construye la app y levanta db + app
+docker compose down           # detiene y elimina los contenedores
+```
+
+El servicio `app` espera a que `postgres` esté sano (`condition: service_healthy`)
+antes de arrancar, y apunta `DATABASE_URL` al host `postgres` de la red interna.
+
 ## 10. Despliegue Automatizado
 
-### Render (render.yaml):
+El proyecto está listo para desplegar en la nube con **Render** usando `render.yaml` (Blueprint de despliegue) y un `Dockerfile` comprometido en el repositorio.
+
+### Código de despliegue (`render.yaml`)
 
 ```yaml
 services:
@@ -249,20 +332,39 @@ services:
   - type: database
     name: aiops-db
     plan: free
+    databaseName: aiops
+    user: aiops
 ```
 
-### Flujo despliegue:
+### Flujo de despliegue (Render)
 
-1. Import repo como Render Blueprint
-2. Añadir `RENDER_DEPLOY_HOOK` como secret GitHub
-3. Render construye imagen, ejecuta migraciones, sirve app
-4. Verificar `/api/v1/health` verde (REQ-CICD-036)
+1. Importar el repositorio como **Render Blueprint** (crea el servicio web + base de datos gestionada).
+2. Añadir el secret `RENDER_DEPLOY_HOOK` en GitHub para que `deploy.yml` dispare releases.
+3. Render construye la imagen Docker, ejecuta las migraciones y sirve la app.
+4. Verificar que `/health` responde con `{"status":"ok"}` (código de estado 200).
+5. (Opcional) Activar UptimeRobot cada 10 min para mantener el servicio Free Tier despierto.
 
-### Free tier considerations:
+### URL de testing (despliegue en la nube)
 
-- PostgreSQL gratuito expira después de 30 días
-- Servicio web duerme cuando está inactivo → cold start ~tens of seconds
-- Monitoreo con UptimeRobot cada 10 min (`/api/v1/health`)
+Una vez desplegado, el servicio expone un endpoint de salud:
+
+```bash
+curl https://<TU-SERVICIO>.onrender.com/health
+# Expected: {"status":"ok","timestamp":"..."}
+```
+
+El marcador `<TU-SERVICIO>.onrender.com` se obtiene del dashboard de Render tras crear el Blueprint. Mientras se completa ese despliegue, la evidencia de funcionamiento local está en `docs/deployment/health_check.png` (respuesta real del endpoint `/health` y de `/api/v1/predict`):
+
+```bash
+# Ejemplo de respuesta real capturada:
+{"status":"ok","timestamp":"2026-11-15T19:41:00.305609"}
+```
+
+### Free Tier (consideraciones)
+
+- PostgreSQL gratuito expira después de 30 días.
+- Servicio web duerme cuando está inactivo → cold start ~tens of seconds.
+- Monitoreo con UptimeRobot cada 10 min (`/health`).
 
 ## 11. Licencia
 

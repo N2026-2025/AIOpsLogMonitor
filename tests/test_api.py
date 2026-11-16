@@ -90,7 +90,12 @@ def test_explain_endpoint():
     
     assert response.status_code == 200
     data = response.json()
-    assert "explanation" in data or "status" in data
+    assert data["status"] == "success"
+    explanation = data["explanation"]
+    assert explanation["success"] is True
+    assert "shap_values" in explanation
+    assert "top_contributing" in explanation
+    assert "decision_path" in explanation
     print(f"[OK] Explain endpoint: {data.get('status', 'unknown')}")
 
 

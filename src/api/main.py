@@ -197,7 +197,13 @@ def explain(request: ExplainRequest):
         
         explain_pipeline = AioExplainPipeline()
         result = explain_pipeline.explain_prediction(request.features)
-        
+
+        if result.get('success') is False:
+            return JSONResponse(
+                {"status": "error", "message": result.get('error', 'Model not loaded')},
+                status_code=503
+            )
+
         return JSONResponse({
             "status": "success",
             "explanation": result,

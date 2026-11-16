@@ -33,6 +33,10 @@ Thumbs.db
 *.swp
 *.swo
 
+.env
+*.env
+*env
+
 # Generated artifacts (analysis / report outputs)
 docs/Globant - 2026 Tech Trends report - ES.pdf
 *Globant - 2026 Tech Trends report - ES.pdf

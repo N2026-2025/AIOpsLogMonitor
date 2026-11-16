@@ -1,0 +1,7 @@
+> curl http://localhost:8000/health
+HTTP/1.1 200 OK
+{"status":"ok","timestamp":"2026-11-15T19:41:00.305609"}
+
+> curl -X POST http://localhost:8000/api/v1/predict -d {...}
+HTTP/1.1 200 OK
+{"status":"success","features":{"event_type":"LOG","severity":"HIGH","status":"FAILURE","duration_ms":5.0,"status_code":500,"hour":14},"failure_prediction":{"failure":true,"confidence":0.7663633658008657,"features":{"event_type":"LOG","seve...

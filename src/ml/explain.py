@@ -12,7 +12,7 @@ class AioExplainPipeline:
     
     def __init__(self, model_path: str = None):
         base_dir = os.path.dirname(__file__)
-        project_root = os.path.dirname(os.path.dirname(base_dir))
+        project_root = os.path.dirname(base_dir)
         self.model_path = model_path or os.path.join(
             project_root, 'artifacts', 'aioplogmonitor_models_v0.1.0.pkl'
         )
@@ -59,32 +59,35 @@ class AioExplainPipeline:
         row['status_failure'] = (row.get('status', 'SUCCESS').str.lower() == 'failure').astype(int)
         row['is_weekend'] = 0
         
-        # Filtrar columnas disponibles
-        X_rf = row[[c for c in self.feature_cols if c in row.columns]].fillna(0)
-        
-        # Codificar categoricas
+        # Alinear a las columnas usadas en entrenamiento (mismo orden y relleno)
+        feature_cols = self.feature_cols or []
+        X_rf = pd.DataFrame(index=row.index)
+        for col in feature_cols:
+            X_rf[col] = row[col] if col in row.columns else 0
+
+        # Codificar categoricas igual que en train
         for col in X_rf.columns:
             if X_rf[col].dtype == 'object':
                 X_rf[col] = X_rf[col].astype('category').cat.codes
+        X_rf = X_rf.fillna(0)
         
         # SHAP explanation
         explainer = shap.TreeExplainer(self.failure_model)
         shap_values = explainer.shap_values(X_rf)
         
-        shap_arr = shap_values[0]
-        if hasattr(shap_arr, 'tolist'):
-            shap_arr = shap_arr.tolist()
+        shap_arr = np.asarray(shap_values[0], dtype=float).reshape(-1)
         
         # Top 5 features contribuyendo al fallo
         top_indices = np.argsort(-np.abs(shap_arr))[:5]
         top_features = []
-        
-        feature_names = self.feature_cols if self.feature_cols else [
+
+        feature_names = list(self.feature_cols) if self.feature_cols else [
             'severity', 'status_failure', 'log_duration', 'status_code_is_error',
             'risk_score', 'duration_ms', 'hour_sin', 'is_weekend'
         ]
-        
+
         for idx in top_indices:
+            idx = int(np.atleast_1d(idx)[0]) if np.ndim(idx) > 0 else int(idx)
             if idx < len(feature_names):
                 direction = "favoring failure" if shap_arr[idx] > 0 else "favoring success"
                 top_features.append(
@@ -103,11 +106,11 @@ class AioExplainPipeline:
         
         return {
             'features': features,
-            'shap_values': shap_arr,
-            'top_contributing': top_features,
-            'decision_path': decision_path,
+            'shap_values': shap_arr.tolist(),
+            'top_contributing': [str(item) for item in top_features],
+            'decision_path': str(decision_path),
             'model_version': self.model_version,
-            'feature_importance': feature_importance_dict,
+            'feature_importance': {str(k): float(v) for k, v in feature_importance_dict.items()},
             'success': True,
         }
     

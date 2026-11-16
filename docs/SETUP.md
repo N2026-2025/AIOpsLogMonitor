@@ -8,6 +8,24 @@
 
 ## Instalación
 
+Recomendamos usar un entorno virtual aislado (`.venv`) para aislar las dependencias del proyecto del resto del sistema:
+
+```bash
+# Crear entorno virtual
+python -m venv .venv
+
+# Activar entorno virtual
+# Windows (PowerShell / cmd):
+.venv\Scripts\activate
+# Linux / macOS:
+source .venv/bin/activate
+
+# Instalar dependencias (con el entorno activo)
+pip install -r requirements.txt
+```
+
+El archivo `requirements.txt` lista todas las dependencias. El entorno virtual se crea en la raíz del proyecto y se ignora con Git (`.venv/` está en `.gitignore`).
+
 ```bash
 git clone <repo-aiops>
 cd AIOpsLogMonitor
