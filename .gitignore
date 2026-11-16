@@ -33,12 +33,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Docker artifacts
-Dockerfile*
-
-# Specific file
+# Generated artifacts (analysis / report outputs)
 docs/Globant - 2026 Tech Trends report - ES.pdf
 *Globant - 2026 Tech Trends report - ES.pdf
-
-# Generated artifacts (analysis / report outputs)
-processed_events_analysis.csv
+docs/Entrevista_AIOps_Log_Monitor.pdf
+*Entrevista_AIOps_Log_Monitor.pdf
+docs/generar_pdf_entrevista
+*.generar_pdf_entrevista
